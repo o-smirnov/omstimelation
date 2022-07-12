@@ -1,0 +1,64 @@
+cabs:
+  ddfacet:
+    command: DDF.py
+    virtual_env: ~/.venv/ddf
+    policies:
+      prefix: '--'
+      # pass True options as --option True
+      explicit_true: 1
+      # pass False options as --option False
+      explicit_false: 0
+    inputs:
+      parset:
+        dtype: File
+        required: false
+        info: "Name of parset to load parameters from (default is to start with global default settings.)"
+        policies:
+          positional_head: true
+      # _include: (DDFacet.Parset)ddfacet_stimela_inputs_schema.yaml
+      ## use local version until stimelation is merged:
+      _include: ddfacet_stimela_inputs_schema.yaml
+      _flatten: 1
+      _flatten_sep: "-"
+
+    outputs:
+      dirty_mfs: 
+        dtype: File
+        must_exist: false
+        implicit: '{current.Output-Name}.dirty.fits' 
+      dirty_corr_mfs: 
+        dtype: File
+        must_exist: false
+        implicit: '{current.Output-Name}.dirty.corr.fits' 
+      app_restored_mfs: 
+        dtype: File
+        must_exist: false
+        implicit: '{current.Output-Name}.app.restored.fits'
+      skymodel:
+        dtype: File
+        must_exist: false
+        implicit: '{current.Output-Name}.DicoModel'
+
+
+
+  killms:
+    command: kMS.py
+    virtual_env: ~/.venv/ddf
+    policies:
+      prefix: '--'
+      # replace:
+      #   '-': '-'
+      explicit_true: true
+      explicit_false: true
+    inputs:
+      parset:
+        dtype: File
+        required: false
+        info: "Name of parset to load parameters from (default is to start with global default settings.)"
+        policies:
+          positional_head: true
+      # _include: (killMS.Parset)killms_stimela_schema.yaml
+      ## use local version until stimelation is merged:
+      _include: killms_stimela_schema.yaml
+      # _flatten: 1
+      # _flatten_sep: "-"

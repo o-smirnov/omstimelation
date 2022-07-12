@@ -1,0 +1,169 @@
+_include:
+  - oms-cabs.yml
+  - oms-ddf-cabs.yml
+  - (quartical)stimela_cabs.yaml
+
+## setup nested logfiles
+opts:
+  log:
+    dir: './{root.dir_out}/logs/log-{run.datetime}'
+    name: log-{info.fqname}.txt
+    nest: 2
+    symlink: log
+
+lib:
+  steps:
+    ## standard DDF step
+    ddfacet:
+      base:
+        cab: ddfacet
+        params:
+          Data-ColName: CORRECTED_DATA 
+          Output-Name: '{recipe.image-prefix}' 
+          Output-Also: r   # output app residuals
+          Image-Cell: '{recipe.pixel_scale}'
+          Image-NPix: '{recipe.image_size}'
+          Facets-DiamMin: 0.03 
+          Facets-DiamMax: 0.3 
+          Data-ChunkHours: 8
+          Freq-NBand: '{recipe.image_nchan}'
+          Freq-NDegridBand: '{recipe.image_nchan_degrid}'
+          Beam-Model: FITS 
+          Beam-NBand: 20 
+          Beam-FITSParAngleIncDeg: 0.5 
+          Beam-FITSFile: '/home/oms/beams/meerkat_pb_jones_cube_95channels_$(xy)_$(reim).fits' 
+          Beam-CenterNorm: 1 
+          Beam-FITSFeed: xy 
+          Beam-FITSFeedSwap: 1 
+          Beam-ApplyPJones: 1 
+          Beam-FlipVisibilityHands: 1 
+          RIME-DecorrMode: FT
+
+      predict-previous:
+        info: "predicts sky model from imaging step directly preceding this one"
+        _use: lib.steps.ddfacet.base
+        params:
+          Output-Mode: Predict 
+          DDESolutions-DDSols: =IFSET(previous.DDESolutions-DDSols)
+          Predict-InitDicoModel: =previous.skymodel #=IFSET(previous.Predict-InitDicoModel)
+          Facets-CatNodes: =IFSET(previous.Facets-CatNodes)
+          Predict-ColName: MODEL_DATA
+          # we don't actually deconvolve in this step, but the model setting needs to be consistent
+          # wit the InitDicoModel being loaded, or it throws an unnecessary error
+          Deconv-Mode: =previous.Deconv-Mode
+
+
+    ## standard killMS step
+    killms:
+      base:
+        cab: killms
+        params:
+          FieldID: 0
+          SolverType: KAFCA 
+          PolMode: Scalar 
+          InCol: CORRECTED_DATA 
+          TChunk: 1
+          # this needs to be consistent with DDF Beam-xxx params 
+          BeamModel: FITS 
+          FITSParAngleIncDeg: 0.5 
+          FITSFile: '/home/oms/beams/meerkat_pb_jones_cube_95channels_$(xy)_$(reim).fits'
+          CenterNorm: 1 
+          FITSFeed: xy 
+          FITSFeedSwap: 1 
+          ApplyPJones: 1 
+          FlipVisibilityHands: 1 
+          NChanBeamPerMS: 20
+
+
+
+  recipes:
+    # a recipe to run killMS in a loop over a list of MSs
+    killms-multi:
+      name: killms-loop
+      info: runs killMS on a series of MSs
+      inputs:
+        MSList:
+          dtype: List[MS]
+        InCol:
+          default: CORRECTED_DATA
+          aliases: ['(killms).InCol']
+        BaseImageName:
+          aliases: ['(killms).BaseImageName']
+        NCPU:
+          aliases: ['(killms).NCPU']
+        OutSolsName:
+          aliases: ['(killms).OutSolsName']
+        dt: 
+          aliases: ['(killms).dt'] 
+        NChanSols: 
+          aliases: ['(killms).NChanSols']
+      for_loop:
+        var: ms
+        over: MSList
+      assign:
+        # add an ms index to the logfile name
+        opts.log.name: 'log-{info.fqname}-ms{recipe.ms@index}.txt'
+      steps:
+        kms:
+          info: invokes killMS on a single MS
+          _use: lib.steps.killms.base
+          cab: killms
+          params:
+            MSName: '{recipe.ms}'
+
+    quartical-multi:
+      name: quartical-loop
+      info: runs quartical on a series of MSs
+      inputs:
+        ms_list:
+          dtype: List[MS]
+        data_column:
+          default: DATA
+          aliases: ['(quartical).input_ms/data_column']
+        weight_column:
+          default: WEIGHT_SPECTRUM
+          aliases: ['(quartical).input_ms/weight_column']
+        model:
+          default: MODEL_DATA
+          aliases: ['(quartical).input_model/recipe']
+        output_col:
+          default: [CORRECTED_DATA]
+        output_dir:
+          # dtype: Dir
+          # default: out/gains.qc
+          aliases: ['(quartical).output/directory']
+        dworkers:
+          default: 1
+          aliases: ['(quartical).dask/workers']
+        dthreads:
+          default: 8
+          aliases: ['(quartical).dask/threads']
+        dscheduler:
+          default: threads
+          aliases: ['(quartical).dask/scheduler']
+        vthreads:
+          default: 8
+          aliases: ['(quartical).solver/threads']
+        ms_corrs:
+          default: 4
+          dtype: int
+          choices: [2, 4]
+          info: "set to 2 for dual-corr MS, 4 for full-corr MSs"
+      for_loop:
+        var: ms
+        over: ms_list
+      assign:
+        # add an ms index to the logfile name
+        opts.log.name: 'log-{info.fqname}-ms{recipe.ms@index}.txt'
+        ms_2corr: [0,1]
+        ms_4corr: [0,3]
+      steps:
+        qc:
+          info: invokes quartical on a single MS
+          _use: lib.steps.quartical.base
+          params:
+            input_ms/path: =recipe.ms
+            input_ms/select_corr: =IF(recipe.ms_corrs == 2, recipe.ms_2corr, recipe.ms_4corr)
+            output/columns: =LIST(recipe.output_col)
+
+

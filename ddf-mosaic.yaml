@@ -1,0 +1,295 @@
+_include:
+  - ddf-mosaic-lib.yaml
+  
+mosaic:
+  # note use of markdown for info strings (usefully rendered by "stimela help")
+  info: | 
+    ---
+    Example recipe implementing *uv*-plane mosaicing and DD-calibration using **DDFacet**/**killMS**.
+
+    This recipe is based on @cyriltasse's write-up here:
+    https://github.com/cyriltasse/DDFacet/wiki/Creating-a-MeerKAT-DD-corrected-intrinsic-flux-image-with-DDF-kMS
+    
+    Note that there is a manual pre-clustering step needed where you pick your facet centers. These
+    steps are marked as skipped by default, since you only run them once by hand.
+    First run the recipe with ``-s image-pre`` to make an initial dirty image, then use DS9 or CARTA
+    to make a ds9 regions file with circular (or elliptic, or box) regions at desired tesselaltion 
+    centres (tip, use bright sources for your initial centers), then run with ``-s clustercat:`` to 
+    generate the clustering file and continue processing. Once the clustering file is ready, you can
+    re-run the recipe with it from any point.
+    
+    ---
+  inputs:
+    obs:
+      choices: [M1, M2]
+      info: "Selects observation set -- various settings will be auto-assigned based on this"
+      required: true
+      default: M2
+    suffix:
+      dtype: str
+      info: "Optional additional suffix for all output filenames, can be empty"
+      default: ''
+    dir_out: 
+      dtype: str
+      required: true
+      info: "Output directory for all data products"
+    centre: 
+      info: "Mosaic phase centre, specified as '[HH:MM:SS DD:MM:SS]'"
+      required: true
+      aliases: [(ddfacet).Image-PhaseCenterRADEC]
+    ncpu:
+      info: "Number of CPUs to use"
+      default: 64
+      # note use of aliases directive to push this value up to all "ddfacet" cabs, and all "ddcal*" steps
+      aliases: [(ddfacet).Parallel-NCPU, ddcal*.NCPU]
+    ms_list: 
+      info: "List of MSs"
+      aliases: [(ddfacet).Data-MS, ddcal*.MSList, dical*.ms_list]
+    precluster:
+      info: "Preclustering regions file to be used for clustercat step"
+      aliases: [clustercat.precluster]
+#      default: ds9.reg
+
+  # automatically set some things up based on the value of the 'obs' input
+  assign_based_on:
+    run.node:
+      simon:
+        obs: M1
+      young:
+        obs: M2
+    obs:
+      M1:
+        ms_list: 
+          - ../msdir/1563189318_sdp_l0-A3528N_corr.ms
+          - ../msdir/1563189318_sdp_l0-A3528S_corr.ms
+          - ../msdir/1563189318_sdp_l0-A3532_corr.ms
+        dir_out: mos1
+        pixel_scale: 1
+        image_size: 18000
+        image_nchan: 3
+        image_nchan_degrid: 10
+        centre:  "[12:55:23.00, -29:41:40.00]"
+        precluster: m1-ds9.reg
+        ms_corrs: 2
+
+      M2:
+        ms_list: 
+          - ../msdir/1562500862_sdp_l0-A3556_corr.ms
+          - ../msdir/1562500862_sdp_l0-A3562-corr.ms
+        dir_out: mos2
+        pixel_scale: 1
+        image_size: 18000
+        image_nchan: 3
+        image_nchan_degrid: 10
+        centre:  "[13:29:18.00, -31:35:56.00]"
+        precluster: m2-ds9.reg
+        ms_corrs: 2
+
+  # standardized image filename prefix used by all imaging steps below: based on step suffix (aka info.suffix) and recipe suffix
+  # (available to substitute as {recipe.image-prefix})
+  assign:
+    image-prefix: '{recipe.dir_out}/im{info.suffix}/im{info.suffix}{recipe.suffix}'
+    clustercat: '{recipe.dir_out}/ClusterCat.npy'
+    log.dir: '{recipe.dir_out}/logs/log-{run.datetime}'
+
+  # and now the actual recipe steps
+  steps:
+    image-pre:
+      _use: lib.steps.ddfacet.base
+      info: makes a dirty image from which a ds9 pre-clustering file can be produced.
+            Run this once, then make a DS9 regions file with tesselation centers for DD solutions.
+      # skip if dirty exists
+      skip: "=EXISTS(current.dirty_mfs)"
+      params:
+        Output-Mode: Dirty 
+
+    clustercat:
+      skip: "=EXISTS(recipe.clustercat)"
+      info: makes a node catalog file based on the image-pre outputs and a pre-clustering file.
+            Run this once, after you've made the DS9 regions file.
+      recipe:
+        aliases:
+          precluster: [make_model.ds9PreClusterFile]
+          clustercat: [copy_model.dest]
+        steps:
+          make_model:
+            cab: ddf_makemodel
+            params:
+              ds9PreClusterFile: '{recipe.precluster}'
+              BaseImageName: '{steps.image-pre.Output-Name}'
+          copy_model:
+            cab: cp
+            params:
+              src: '{steps.make_model.ClusterCat}'
+      params:
+        clustercat: '{recipe.clustercat}'
+
+    image-di2:
+      skip: "=EXISTS(current.app_restored_mfs)"
+      info: "initial SSD2 deconvolution step"
+      _use: lib.steps.ddfacet.base
+      params:
+        Output-Mode: Clean 
+        Facets-CatNodes: '{recipe.clustercat}'
+        Deconv-Mode: SSD2 
+        SSD2-PolyFreqOrder: 3 
+        Deconv-MaxMajorIter: 2 
+        Mask-Auto: 1
+
+    mask-di2:
+      skip: "=EXISTS(current.mask)"
+      info: "generate a deep mask"
+      cab: breizorro
+      params:
+        restored_image: '{steps.image-di2.app_restored_mfs}'
+        threshold: 5
+        mask: '{recipe.image-prefix}-mask-{current.threshold}.fits'
+
+    image-di3:
+      skip: "=EXISTS(current.app_restored_mfs)"
+      info: "deeper SSD2 deconvolution step using the new mask"
+      _use: lib.steps.ddfacet.base
+      params:
+        Output-Mode: Clean 
+        Facets-CatNodes: '{recipe.clustercat}'
+        Predict-InitDicoModel: '{steps.image-di2.skymodel}'
+        Cache-Reset: 0
+        Cache-Dirty: forceresidual
+        Cache-PSF: force
+        Deconv-Mode: SSD2 
+        SSD2-PolyFreqOrder: 3 
+        Deconv-MaxMajorIter: 1
+        Mask-Auto: 0
+        Mask-External: '{steps.mask-di2.mask}'
+
+    predict-di3:
+      skip: true
+      _use: lib.steps.ddfacet.predict-previous
+
+    dical-3:
+      skip: true
+      recipe:
+        _use: lib.recipes.quartical-multi
+      params:
+        ms_corrs: =recipe.ms_corrs
+        output_dir: '{info.label}-gains.qc'
+        model: 'MODEL_DATA'
+        output_col: 'SELFCAL{info.suffix}_DATA'
+
+    image-di4:
+      skip: "=EXISTS(current.app_restored_mfs)"
+      info: "deep SSD2 deconvolution of selfcal data from above"
+      _use: lib.steps.ddfacet.base
+      params:
+        Data-ColName: =previous.output_col
+        Output-Mode: Clean 
+        Facets-CatNodes: '{recipe.clustercat}'
+        Cache-Reset: true
+        Deconv-Mode: SSD2 
+        SSD2-PolyFreqOrder: 3 
+        Deconv-MaxMajorIter: 3
+        Mask-Auto: 0
+        Mask-External: =steps.mask-di2.mask
+
+    predict-di4:
+      skip: true
+      _use: lib.steps.ddfacet.predict-previous
+
+    mask-di4:
+      skip: "=EXISTS(current.mask)"
+      info: "generate a deep mask"
+      cab: breizorro
+      params:
+        restored_image: =previous.app_restored_mfs
+        threshold: 5
+        mask: '{recipe.image-prefix}-mask-{current.threshold}.fits'
+
+    dical-4:
+      skip: true
+      recipe:
+        _use: lib.recipes.quartical-multi
+      params:
+        ms_corrs: =recipe.ms_corrs
+        output_dir: '{info.label}-gains.qc'
+        model: 'MODEL_DATA'
+        output_col: 'SELFCAL{info.suffix}_DATA'
+
+    image-di5:
+      skip: "=EXISTS(current.app_restored_mfs)"
+      info: "deep SSD2 deconvolution of selfcal data from above"
+      _use: lib.steps.ddfacet.base
+      params:
+        Data-ColName: =previous.output_col
+        Output-Mode: Clean 
+        Facets-CatNodes: =recipe.clustercat
+        Cache-Reset: true
+        Deconv-Mode: SSD2 
+        SSD2-PolyFreqOrder: 3 
+        Deconv-MaxMajorIter: 3
+        Mask-Auto: 0
+        Mask-External: =steps.mask-di4.mask
+
+    ddcal-1:
+      info: "DD-calibration using killMS, over multiple MSs"
+      recipe:
+        _use: lib.recipes.killms-multi
+      params:
+        InCol: =previous.Data-ColName
+        BaseImageName: =previous.Output-Name
+        OutSolsName: DD0
+
+    image-dd1:
+      info: "DD-imaging using solutions derived above"
+      _use: lib.steps.ddfacet.base
+      params:
+        Data-ColName: =previous.InCol
+        Output-Mode: Clean 
+        DDESolutions-DDSols: =previous.OutSolsName
+        Predict-InitDicoModel: '{steps.image-di5.skymodel}'
+        Predict-ColName: MODEL_DATA
+        Cache-Reset: true
+        Cache-PSF: auto
+        Cache-Dirty: auto
+        Deconv-Mode: SSD2 
+        SSD2-PolyFreqOrder: 3 
+        Deconv-MaxMajorIter: 1
+        Mask-External: '{steps.mask-di2.mask}'
+        Beam-Smooth: 1
+        Weight-ColName: '[WEIGHT_SPECTRUM,IMAGING_WEIGHT]'
+
+    ddcal-2:
+      skip: true
+      info: "DD-calibration using killMS, over multiple MSs"
+      recipe:
+        _use: lib.recipes.killms-multi
+      params:
+        InCol: =steps.ddcal-1.InCol
+        BaseImageName: =steps.image-di5.Output-Name
+        OutSolsName: DD1
+        dt: 2
+        NChanSols: 24
+
+    image-dd2:
+      skip: true
+      info: "DD-imaging using solutions derived above"
+      _use: lib.steps.ddfacet.base
+      params:
+        Data-ColName: =previous.InCol
+        Output-Mode: Clean 
+        DDESolutions-DDSols: =previous.OutSolsName
+        Predict-InitDicoModel: '{steps.image-di5.skymodel}'
+        Predict-ColName: MODEL_DATA
+        Cache-Reset: true
+        Cache-PSF: auto
+        Cache-Dirty: auto
+        Deconv-Mode: SSD2 
+        SSD2-PolyFreqOrder: 3 
+        Deconv-MaxMajorIter: 1
+        Mask-External: '{steps.mask-di2.mask}'
+        Beam-Smooth: 1
+        Weight-ColName: '[WEIGHT_SPECTRUM,IMAGING_WEIGHT]'
+
+    predict-dd2:
+      skip: true
+      _use: lib.steps.ddfacet.predict-previous
+
