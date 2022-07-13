@@ -1,5 +1,6 @@
 _include:
-  - (quartical)stimela_cabs.yaml
+  - (quartical)stimela_cabs.yaml[optional]
+  - (cubical)stimela/stimela_cabs.yaml[optional]
 
 ## this augments the standard 'cabs' config section
 cabs:
@@ -30,130 +31,6 @@ cabs:
         dtype: str
         policies:
           positional: true
-
-  gocubical:
-    command: gocubical
-    policies:
-      prefix: '--'
-      replace:
-        '/': '-'
-      explicit_true: true
-      explicit_false: false
-    inputs:
-      _include: (cubical.stimela)schema.yaml
-      _flatten: 1
-      _flatten_sep: '/'
-    dynamic_schema: cubical.stimela.make_stimela_schema
-
-  cubical:
-    command: gocubical
-    virtual_env: ~/.venv/cc
-    policies:
-      prefix: '--'
-      replace: {'_': '-'}
-      explicit_true: 'True'
-      explicit_false: 'False'
-    inputs:
-      ms:
-        dtype: MS
-        required: true
-        writable: true
-        nom_de_guerre: data-ms
-      parset:
-        dtype: str
-        policies:
-          positional_head: true
-      data_column:
-        dtype: str
-      data_time_chunk:
-        dtype: int
-      data_freq_chunk:
-        dtype: int
-      model_list:
-        dtype: str
-      model_null_v:
-        dtype: int
-      model_pa_rotate:
-        dtype: bool
-      model_feed_rotate:
-        dtype: str
-      sol_jones:
-        dtype: List[str]
-        policies:
-          repeat: ","
-      sol_term_iters:
-        dtype: List[int]
-        policies:
-          repeat: ","
-      k_solvable:
-        dtype: bool
-      k_type:
-        dtype: str
-      k_time_int:
-        dtype: int
-      k_freq_int:
-        dtype: int
-      k_dd_term:
-        dtype: int
-      k_update_type:
-        dtype: str
-      x_solvable:
-        dtype: bool
-      x_xfer_from:
-        dtype: File
-      madmax_threshold:
-        dtype: float
-      madmax_global_threshold:
-        dtype: float
-      out_column:
-        dtype: str
-      out_mode:
-        choices: [sc, sr, so, ac, ar]
-      out_dir:
-        dtype: str
-      out_name:
-        dtype: str
-      out_subtract_dirs:
-        dtype: str
-      dist_ncpu:
-        dtype: int
-      debug_pdb:
-        dtype: bool
-        default: false
-
-  cubical_gain_plots:
-    command: plot-gain-solutions
-    virtual_env: ~/.venv/cc
-    policies:
-      prefix: '--'
-      replace: {'_': '-'}
-    inputs:
-      table:
-        dtype: File
-        required: true
-        policies:
-          positional: true
-      parameter:
-        dtype: str
-      label:
-        dtype: str
-      gain:
-        dtype: bool
-      bandpass:
-        dtype: bool
-      leakage:
-        dtype: bool
-      diag:
-        choices: [ri, ap, none]
-      off-diag:
-        choices: [ri, ap, none]
-      nrow:
-        dtype: int
-      ncol:
-        dtype: int
-    outputs:
-      output-name:
-        dtype: File
 
   mv:
     command: mv
