@@ -620,29 +620,29 @@ lib:
       base:
         cab: quartical
         params:
-          input_ms/time_chunk: '16'
-          input_ms/freq_chunk: '0'
-          input_ms/group_by: [SCAN_NUMBER,FIELD_ID,DATA_DESC_ID]
-          input_ms/select_uv_range: [150, 0]
-          input_ms/select_corr: [0, 3]
-          input_model/apply_p_jones: false
-          solver/terms: [K]
-          solver/iter_recipe: [25]
-          solver/propagate_flags: true
-          solver/robust: false
-          output/overwrite: true
-          output/products: [corrected_data]
-          output/columns: [CORRECTED_DATA]
-          output/flags: true
-          output/apply_p_jones_inv: false
-          output/net_gain: false
-          mad_flags/enable: true
-          mad_flags/threshold_bl: 5
-          mad_flags/threshold_global: 5
-          mad_flags/max_deviation: 5
-          K/time_interval: 1
-          K/freq_interval: 0
-          K/type: delay
+          input_ms.time_chunk: '16'
+          input_ms.freq_chunk: '0'
+          input_ms.group_by: [SCAN_NUMBER,FIELD_ID,DATA_DESC_ID]
+          input_ms.select_uv_range: [150, 0]
+          input_ms.select_corr: [0, 3]
+          input_model.apply_p_jones: false
+          solver.terms: [K]
+          solver.iter_recipe: [25]
+          solver.propagate_flags: true
+          solver.robust: false
+          output.overwrite: true
+          output.products: [corrected_data]
+          output.columns: [CORRECTED_DATA]
+          output.flags: true
+          output.apply_p_jones_inv: false
+          output.net_gain: false
+          mad_flags.enable: true
+          mad_flags.threshold_bl: 5
+          mad_flags.threshold_global: 5
+          mad_flags.max_deviation: 5
+          K.time_interval: 1
+          K.freq_interval: 0
+          K.type: delay
 
 
 
