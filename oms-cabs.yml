@@ -464,6 +464,31 @@ cabs:
       regfile:
         dtype: File
 
+  flagman:
+    command: casa --nogui --log2term -c 'flagmanager(vis="{current.ms}", mode="{current.mode}", versionname="{current.name}")'
+    policies:
+      skip: true
+    inputs:
+      ms: 
+        dtype: MS
+        required: true
+        default: '{recipe.ms}'
+      name:
+        info: "flag version name"
+        required: true
+      mode: 
+        choices: [save, restore]
+        default: restore  
+
+  flagsummary:
+    command: casa --nogui --log2term -c 'flagdata(vis="{current.ms}", mode="summary")' 
+    policies:
+      skip: true
+    inputs:
+      ms: 
+        dtype: MS
+        required: true
+        default: '{recipe.ms}'
 
 lib:
   steps:
@@ -477,7 +502,6 @@ lib:
           padding: 1.3
           nwlayers_factor: 3
           nchan: 8
-          temp_dir: /home/oms/tmp
           use_wgridder: true
           log_time: true
 
