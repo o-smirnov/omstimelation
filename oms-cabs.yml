@@ -481,7 +481,7 @@ cabs:
         default: restore  
 
   flagsummary:
-    command: casa --nogui --log2term -c 'flagdata(vis="{current.ms}", mode="summary")' 
+    command: casa --nogui --log2term -c 'flagdata(vis="{current.ms}", mode="summary", spw="{current.spw}")' 
     policies:
       skip: true
     inputs:
@@ -489,6 +489,9 @@ cabs:
         dtype: MS
         required: true
         default: '{recipe.ms}'
+      spw:
+        dtype: str
+        default: all
 
 lib:
   steps:
