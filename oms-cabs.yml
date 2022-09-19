@@ -58,9 +58,6 @@ cabs:
         dtype: Union[File, Directory]
         required: true
 
-
-
-
   print_uniq_column_values:
     command: "python3 -c 'from casacore.tables import table; import sys; print(len(set(table(sys.argv[1]).getcol(sys.argv[2]))),sys.argv[3]);'"
     policies:
@@ -472,7 +469,6 @@ cabs:
       ms: 
         dtype: MS
         required: true
-        default: '{recipe.ms}'
       name:
         info: "flag version name"
         required: true
@@ -493,6 +489,40 @@ cabs:
         dtype: str
         default: all
 
+  smops:
+    command: smops --ms {current.ms}
+    policies:
+      prefix: '-'
+    inputs:
+      od:
+        dtype: Directory
+        mkdir: true
+        must_exist: false
+      nthreads:
+        dtype: int
+      stokes:
+        dtype: str
+        default: I
+      ms:
+        dtype: MS
+        policies:
+          skip: true
+      ip:
+        required: true
+        dtype: str
+      co:
+        required: true
+        dtype: int
+      order:
+        dtype: int
+
+    outputs:
+      model-prefix:
+        implicit: =IFSET(current.od,SELF,'.') + "/" + BASENAME(current.ip)
+      model:
+        dtype: List[File]
+        implicit: =GLOB("{current.model-prefix}*model*fits")
+
 lib:
   steps:
     wsclean:
@@ -500,20 +530,16 @@ lib:
         info: "base wsclean settings"
         cab: wsclean
         params:
-          size: 10000
-          scale: 0.8asec
           padding: 1.3
-          nwlayers_factor: 3
-          nchan: 8
-          use_wgridder: true
-          log_time: true
+          nwlayers-factor: 3
+          use-wgridder: true
+          log-time: true
 
       dirty:
         _use: lib.steps.wsclean.base
         info: "wsclean step for dirty-only image"
         params:
           column: CORRECTED_DATA
-          weight: 'briggs 0'
           niter: 0
           # parallel_gridding: 64
 
@@ -528,30 +554,19 @@ lib:
         _use: lib.steps.wsclean.dirty
         info: "wsclean step for imaging"
         params:
-          column: CORRECTED_DATA
-          mgain: 0.9
-          weight: 'briggs 0'
-          fit_beam: true
-          elliptical_beam: true
-          parallel_deconvolution: 1500
-          niter: 50000
-          join_channels: true
-          fit_spectral_pol: 4
+          fit-beam: true
+          elliptical-beam: true
+#          parallel-deconvolution: 1500
+          join-channels: true
 
       image_pol:
         _use: lib.steps.wsclean.image
         info: "wsclean step for IQUV imaging"
         cab: wsclean_pol
         params:
-          join_polarizations: true
-          fit_spectral_pol: 
+          join-polarizations: true
+          fit-spectral-pol: 
           pol: IQUV
-
-      image_pol2:
-        _use: lib.steps.wsclean.image_pol
-        info: "wsclean step for IQ imaging"
-        params:
-          pol: IQ
 
       predict:
         _use: lib.steps.wsclean.base
@@ -670,7 +685,6 @@ lib:
           K.time_interval: 1
           K.freq_interval: 0
           K.type: delay
-
 
 
 
