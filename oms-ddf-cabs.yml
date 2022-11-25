@@ -4,10 +4,12 @@ cabs:
     virtual_env: ~/.venv/ddf
     policies:
       prefix: '--'
-      # pass True options as --option True
+      # pass True options as ..option True
       explicit_true: 1
-      # pass False options as --option False
+      # pass False options as ..option False
       explicit_false: 0
+      replace:
+        '.': '-'
     inputs:
       parset:
         dtype: File
@@ -18,26 +20,26 @@ cabs:
       # _include: (DDFacet.Parset)ddfacet_stimela_inputs_schema.yaml
       ## use local version until stimelation is merged:
       _include: ddfacet_stimela_inputs_schema.yaml
-      _flatten: 1
-      _flatten_sep: "-"
+      # _flatten: 1
+      # _flatten_sep: "."
 
     outputs:
       dirty_mfs: 
         dtype: File
         must_exist: false
-        implicit: '{current.Output-Name}.dirty.fits' 
+        implicit: '{current.Output.Name}.dirty.fits' 
       dirty_corr_mfs: 
         dtype: File
         must_exist: false
-        implicit: '{current.Output-Name}.dirty.corr.fits' 
+        implicit: '{current.Output.Name}.dirty.corr.fits' 
       app_restored_mfs: 
         dtype: File
         must_exist: false
-        implicit: '{current.Output-Name}.app.restored.fits'
+        implicit: '{current.Output.Name}.app.restored.fits'
       skymodel:
         dtype: File
         must_exist: false
-        implicit: '{current.Output-Name}.DicoModel'
+        implicit: '{current.Output.Name}.DicoModel'
 
 
 
@@ -45,9 +47,9 @@ cabs:
     command: kMS.py
     virtual_env: ~/.venv/ddf
     policies:
-      prefix: '--'
+      prefix: '..'
       # replace:
-      #   '-': '-'
+      #   '.': '.'
       explicit_true: true
       explicit_false: true
     inputs:
@@ -61,4 +63,93 @@ cabs:
       ## use local version until stimelation is merged:
       _include: killms_stimela_schema.yaml
       # _flatten: 1
-      # _flatten_sep: "-"
+      # _flatten_sep: "."
+      
+  ddf_makemodel:
+    command: MakeModel.py
+    virtual_env: ~/.venv/ddf
+    inputs:
+      ds9PreClusterFile:
+        dtype: File
+        required: true
+      BaseImageName:
+        dtype: str
+        required: true
+      NCluster:
+        dtype: int
+        default: 0
+    outputs:
+      ClusterCat:
+        implicit: '{current.ds9PreClusterFile}.ClusterCat.npy'
+
+lib:
+  steps:
+    ddfacet:
+      base:
+        cab: ddfacet
+        params:
+          Data.ColName: CORRECTED_DATA 
+          Image.Cell: 0.8 
+          Image.NPix: 10000 
+          Facets.DiamMin: 0.03 
+          Facets.DiamMax: 0.3 
+          Parallel.NCPU: 96 
+          Data.ChunkHours: 2 
+          Freq.NBand: 3 
+          Freq.NDegridBand: 10 
+          RIME.DecorrMode: FT
+          Weight.ColName: WEIGHT_SPECTRUM
+      
+      meerkat_beam:    
+        params:
+          Beam.Model: FITS
+          Beam.NBand: 20 
+          Beam.FITSParAngleIncDeg: 0.5 
+          Beam.FITSFile: 'beams/meerkat_pb_jones_cube_95channels_$(xy)_$(reim).fits' 
+          Beam.CenterNorm: true
+          Beam.FITSFeed: xy 
+          Beam.FITSFeedSwap: true
+          Beam.ApplyPJones: true 
+          Beam.FlipVisibilityHands: true
+          Beam.Smooth: 1
+  
+      dirty:
+        _use: lib.steps.ddfacet.base
+        params:
+          Output.Mode: Dirty
+
+      ssd2:
+        _use: lib.steps.ddfacet.base
+        params:
+          Output.Mode: Clean
+          Deconv.Mode: SSD2
+          Deconv.MaxMajorIter: 2
+          SSD2.PolyFreqOrder: 3 
+          Mask.Auto: true
+          Facets.CatNodes: none # ds9.reg.ClusterCat.npy
+
+    killms:
+      base:
+        cab: killms
+        params:
+          FieldID: 0
+          SolverType: KAFCA 
+          PolMode: Scalar 
+          dt: 5
+          NCPU: 96 
+          OutSolsName: DD0 
+          NChanSols: 20 
+          InCol: CORRECTED_DATA 
+          TChunk: 2
+
+      meerkat_beam:    
+        params:
+          BeamModel: FITS
+          NChanBeamPerMS: 20 
+          FITSParAngleIncDeg: 0.5 
+          FITSFile: 'beams/meerkat_pb_jones_cube_95channels_$(xy)_$(reim).fits' 
+          CenterNorm: true
+          FITSFeed: xy 
+          FITSFeedSwap: true
+          ApplyPJones: true 
+          FlipVisibilityHands: true

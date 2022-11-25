@@ -236,175 +236,6 @@ cabs:
         policies:
           repeat: list
 
-  ddfacet-deprecated:
-    command: DDF.py
-    virtual_env: ~/.venv/ddf
-    policies:
-      prefix: '--'
-      replace: {'__': '-'}
-      explicit_true: 'True'
-      explicit_false: 'False'
-    inputs:
-      parset:
-        dtype: File
-        required: false
-        policies:
-          positional: true
-      Output-Name:
-        dtype: str
-        required: true 
-        mkdir: true
-      Data-MS: 
-        dtype: MS
-      Data-ColName:
-        default: CORRECTED_DATA
-      Data-ChunkHours:
-        dtype: float
-      Image-Cell:
-        dtype: float
-      Image-NPix:
-        dtype: int
-      Output-Mode:
-        default: Clean
-      Facets-DiamMin:
-        dtype: float
-      Facets-DiamMax:
-        dtype: float
-      Parallel-NCPU:
-        dtype: int
-      Freq-NBand:
-        dtype: int
-      Freq-NDegridBand:
-        dtype: int 
-      RIME-DecorrMode:
-        dtype: str
-      Deconv-Mode:
-        choices: [SSD, SSD2, HMP, Hogbom]
-      Deconv-MaxMajorIter:
-        dtype: int
-      Facets-NFacets:
-        dtype: int
-      Facets-CatNodes:
-        dtype: File
-      SSD2-PolyFreqOrder: 
-        dtype: int
-      Mask-External:
-        dtype: File
-      Mask-Auto:
-        dtype: bool
-      Mask-SigTh:
-        dtype: float
-      Cache-Reset:
-        dtype: bool
-      Cache-Dirty:
-        choices: [off, reset, auto, forcedirty, forceresidual]
-      Cache-PSF:
-        choices: [off, reset, auto, force]
-      Weight-ColName:
-        dtype: Union[str, List[str]]
-        policies:
-          repeat: '[]'
-      Predict-InitDicoModel:
-        dtype: File
-      Predict-ColName:
-        dtype: str
-      DDESolutions-DDSols:
-        dtype: str
-      Beam-Model:
-        dtype: str
-        choices: [None, FITS]
-      Beam-Smooth:
-        dtype: bool
-      Beam-NBand:
-        dtype: int
-      Beam-FITSParAngleIncDeg:
-        dtype: float
-      Beam-FITSFile:
-        dtype: str
-      Beam-CenterNorm:
-        dtype: bool
-      Beam-FITSFeed:
-        dtype: str
-      Beam-FITSFeedSwap:
-        dtype: bool
-      Beam-ApplyPJones:
-        dtype: bool
-      Beam-FlipVisibilityHands:
-        dtype: bool
-      Log-Boring:
-        dtype: bool
-        default: true
-
-  ddf_makemodel:
-    command: MakeModel.py
-    inputs:
-      ds9PreClusterFile:
-        dtype: File
-        required: true
-      BaseImageName:
-        dtype: str
-        required: true
-      NCluster:
-        dtype: int
-        default: 0
-    outputs:
-      ClusterCat:
-        implicit: '{current.ds9PreClusterFile}.ClusterCat.npy'
-
-  killms-deprecated:
-    command: kMS.py
-    virtual_env: ~/.venv/ddf
-    policies:
-      prefix: '--'
-      replace: {'__': '-'}
-      explicit_true: 'True'
-      explicit_false: 'False'
-    inputs:
-      MSName:
-        dtype: MS
-        required: true
-      BaseImageName:
-        dtype: str
-        required: true
-      InCol:
-        dtype: str
-        default: CORRECTED_DATA
-      FieldID:
-        dtype: int
-      SolverType:
-        choices: [KAFCA, CohJones]
-      PolMode:
-        dtype: str
-      dt:
-        dtype: float
-      NCPU:
-        dtype: int
-      OutSolsName:
-        dtype: str
-        required: true
-      NChanSols:
-        dtype: int
-      TChunk:
-        dtype: float
-      BeamModel:
-        choices: [None, FITS]
-      NChanBeamPerMS:
-        dtype: int
-      FITSParAngleIncDeg:
-        dtype: float
-      FITSFile:
-        dtype: str
-      CenterNorm:
-        dtype: bool
-      FITSFeed:
-        dtype: str
-      FITSFeedSwap:
-        dtype: bool
-      ApplyPJones:
-        dtype: bool
-      FlipVisibilityHands:
-        dtype: bool
-
   convolve_image:
     command: (image_utils)convolve_image
     inputs:
@@ -462,32 +293,33 @@ cabs:
         dtype: File
 
   flagman:
-    command: casa --nogui --log2term -c 'flagmanager(vis="{current.ms}", mode="{current.mode}", versionname="{current.name}")'
-    policies:
-      skip: true
+    command: flagmanager
+    flavour: casa-task
+    # command: casa --nogui --log2term -c 'flagmanager(vis="{current.ms}", mode="{current.mode}", versionname="{current.name}")'
     inputs:
       ms: 
         dtype: MS
         required: true
-      name:
+        nom_de_guerre: vis
+      versionname:
         info: "flag version name"
-        required: true
       mode: 
-        choices: [save, restore]
-        default: restore  
+        choices: [save, restore, list]
+        required: true
 
   flagsummary:
-    command: casa --nogui --log2term -c 'flagdata(vis="{current.ms}", mode="summary", spw="{current.spw}")' 
-    policies:
-      skip: true
+    command: flagdata
+    flavour: casa-task
     inputs:
       ms: 
         dtype: MS
         required: true
-        default: '{recipe.ms}'
+        nom_de_guerre: vis
       spw:
         dtype: str
         default: all
+      mode:
+        implicit: 'summary'
 
   smops:
     command: smops --ms {current.ms}
@@ -558,6 +390,7 @@ lib:
           elliptical-beam: true
 #          parallel-deconvolution: 1500
           join-channels: true
+          mgain: 0.9
 
       image_pol:
         _use: lib.steps.wsclean.image
@@ -565,8 +398,9 @@ lib:
         cab: wsclean_pol
         params:
           join-polarizations: true
-          fit-spectral-pol: 
+          fit-spectral-pol: =UNSET
           pol: IQUV
+          mgain: 0.9
 
       predict:
         _use: lib.steps.wsclean.base
@@ -588,103 +422,39 @@ lib:
         params:
           pol: IQUV
 
-    ddfacet:
-      base:
-        cab: ddfacet-0
-        params:
-          Data-ColName: CORRECTED_DATA 
-          Image-Cell: 0.8 
-          Image-NPix: 10000 
-          Facets-DiamMin: 0.03 
-          Facets-DiamMax: 0.3 
-          Parallel-NCPU: 96 
-          Data-ChunkHours: 2 
-          Freq-NBand: 3 
-          Freq-NDegridBand: 10 
-          RIME-DecorrMode: FT
-          Weight-ColName: WEIGHT_SPECTRUM
-      
-      meerkat_beam:    
-        params:
-          Beam-Model: FITS
-          Beam-NBand: 20 
-          Beam-FITSParAngleIncDeg: 0.5 
-          Beam-FITSFile: 'beams/meerkat_pb_jones_cube_95channels_$(xy)_$(reim).fits' 
-          Beam-CenterNorm: true
-          Beam-FITSFeed: xy 
-          Beam-FITSFeedSwap: true
-          Beam-ApplyPJones: true 
-          Beam-FlipVisibilityHands: true
-          Beam-Smooth: 1
-  
-      dirty:
-        _use: lib.steps.ddfacet.base
-        params:
-          Output-Mode: Dirty
-
-      ssd2:
-        _use: lib.steps.ddfacet.base
-        params:
-          Output-Mode: Clean
-          Deconv-Mode: SSD2
-          Deconv-MaxMajorIter: 2
-          SSD2-PolyFreqOrder: 3 
-          Mask-Auto: true
-          Facets-CatNodes: none # ds9.reg.ClusterCat.npy
-
-    killms:
-      base:
-        cab: killms
-        params:
-          FieldID: 0
-          SolverType: KAFCA 
-          PolMode: Scalar 
-          dt: 5
-          NCPU: 96 
-          OutSolsName: DD0 
-          NChanSols: 20 
-          InCol: CORRECTED_DATA 
-          TChunk: 2
-
-      meerkat_beam:    
-        params:
-          BeamModel: FITS
-          NChanBeamPerMS: 20 
-          FITSParAngleIncDeg: 0.5 
-          FITSFile: 'beams/meerkat_pb_jones_cube_95channels_$(xy)_$(reim).fits' 
-          CenterNorm: true
-          FITSFeed: xy 
-          FITSFeedSwap: true
-          ApplyPJones: true 
-          FlipVisibilityHands: true
 
     quartical:
       base:
         cab: quartical
         params:
-          input_ms.time_chunk: '16'
-          input_ms.freq_chunk: '0'
-          input_ms.group_by: [SCAN_NUMBER,FIELD_ID,DATA_DESC_ID]
-          input_ms.select_uv_range: [150, 0]
-          input_ms.select_corr: [0, 3]
-          input_model.apply_p_jones: false
-          solver.terms: [K]
-          solver.iter_recipe: [25]
-          solver.propagate_flags: true
-          solver.robust: false
-          output.overwrite: true
-          output.products: [corrected_data]
-          output.columns: [CORRECTED_DATA]
-          output.flags: true
-          output.apply_p_jones_inv: false
-          output.net_gain: false
-          mad_flags.enable: true
-          mad_flags.threshold_bl: 5
-          mad_flags.threshold_global: 5
-          mad_flags.max_deviation: 5
-          K.time_interval: 1
-          K.freq_interval: 0
-          K.type: delay
+          input_ms:
+            time_chunk: '16'
+            freq_chunk: '0'
+            group_by: [SCAN_NUMBER,FIELD_ID,DATA_DESC_ID]
+            select_uv_range: [150, 0]
+            select_corr: [0, 3]
+          input_model:
+            apply_p_jones: false
+          solver:
+            terms: [K]
+            iter_recipe: [25]
+            propagate_flags: true
+            robust: false
+          output:
+            overwrite: true
+            products: [corrected_data]
+            columns: [CORRECTED_DATA]
+            flags: true
+            apply_p_jones_inv: false
+          mad_flags:
+            enable: true
+            threshold_bl: 5
+            threshold_global: 5
+            max_deviation: 5
+          K:
+            time_interval: 1
+            freq_interval: 0
+            type: delay
 
 
 
