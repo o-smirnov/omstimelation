@@ -305,7 +305,6 @@ cabs:
   flagman:
     command: flagmanager
     flavour: casa-task
-    # command: casa --nogui --log2term -c 'flagmanager(vis="{current.ms}", mode="{current.mode}", versionname="{current.name}")'
     inputs:
       ms: 
         dtype: MS
@@ -370,6 +369,43 @@ cabs:
       model:
         dtype: List[File]
         implicit: =GLOB("{current.output-prefix}*model*fits")
+
+  tricolour:
+    command: tricolour
+    inputs:
+      ms:
+        dtype: MS
+        policies:
+          positional: true
+      config:
+        dtype: File
+      ignore-flags:
+        dtype: bool
+      flagging-strategy:
+        choices: [standard,polarisation,total_power]
+      row-chunks:
+        dtype: int
+      baseline-chunks:
+        dtype: int
+      nworkers:
+        dtype: int
+      dilate-masks:
+        dtype: Union[int,str]
+      data-column:
+        dtype: str
+      field-names:
+        dtype: str
+      scan_numbers:
+        dtype: str
+      disable-post-mortem:
+        dtype: bool
+        default: true
+      window-backend:
+        choices: [numpy, zarr-disk]
+      temporary-directory:
+        dtype: Directory
+      subtract-model-column:
+        dtype: str
 
 lib:
   steps:
