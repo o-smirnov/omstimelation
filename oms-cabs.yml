@@ -338,6 +338,31 @@ cabs:
           - PARSE_OUTPUT:percentage:float
           - HIGHLIGHT:bold green
 
+  msutils.copycol:
+    flavour: python
+    command: MSUtils.msutils.copycol
+    inputs:
+      msname: 
+        dtype: MS
+        required: true
+      fromcol:
+        dtype: str
+        required: true
+      tocol:
+        dtype: str
+        required: true
+
+  msutils.addcol:
+    flavour: python
+    command: MSUtils.msutils.addcol
+    inputs:
+      msname: 
+        dtype: MS
+        required: true
+      colname:
+        dtype: str
+        required: true
+
   smops:
     command: smops --ms {current.ms}
     policies:
