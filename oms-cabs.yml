@@ -278,6 +278,8 @@ cabs:
         dtype: List[str]
         policies:
           repeat: list
+      ignore_missing_islands:
+        dtype: bool
       invert:
         dtype: bool
       make_binary:
@@ -371,6 +373,7 @@ cabs:
       output-prefix:
         dtype: str
         required: true
+        mkdir: true
       num-threads:
         dtype: int
       stokes:
@@ -394,6 +397,43 @@ cabs:
       model:
         dtype: List[File]
         implicit: =GLOB("{current.output-prefix}*model*fits")
+
+  fft-image:
+    flavour: python-code
+    command: |
+      from astropy.io import fits
+      from numpy import fft
+      import math
+      ff = fits.open(image)
+      im = ff[0].data[0,0,...]
+      hdr = ff[0].header
+      im[:] = fft.fftshift(abs(fft.fft2(im)))
+      if lambda_per_arcsec:
+        scaling =  1 / (3600 * lambda_per_arcsec)
+        hdr['CUNIT1'] = hdr['CUNIT2'] = 'deg'
+      else:
+        hdr['CTYPE1'] = 'U'
+        hdr['CTYPE2'] = 'V'
+        hdr['CUNIT1'] = hdr['CUNIT2'] = 'lambda'
+        scaling = 1 
+      hdr['CDELT1'] = scaling / (abs(hdr['CDELT1'])*hdr['NAXIS1']*math.pi/180)
+      hdr['CDELT2'] = scaling / (abs(hdr['CDELT2'])*hdr['NAXIS2']*math.pi/180)
+      hdr['CRVAL1'] = hdr['CRVAL2'] = 0.0
+      ff.writeto(fft_image, overwrite=True)
+    inputs: 
+      image: 
+        dtype: File
+        required: True
+      lambda-per-arcsec:
+        info: |
+          If set, fakes a WCS at RA=0 Dec=0, with that many uv-lambdas per arcsec. This can be useful to
+          fool some FITS viewers (i.e. CARTA) into drawing a useful WCS, which they otherwise don't 
+        dtype: float
+        default: 0
+    outputs:
+      fft-image:
+        dtype: File
+        required: true
 
   tricolour:
     command: tricolour
