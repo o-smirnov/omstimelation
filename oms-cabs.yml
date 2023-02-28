@@ -22,6 +22,23 @@ cabs:
       maxuvw-m:
         dtype: float
 
+  wsclean_pol:
+    # policies:
+    #   skip_implicits: true
+    image: ''
+    command: /home/oms/src/wsclean/build/wsclean
+    inputs:
+      taper-inner-tukey:
+        dtype: float
+      minuv-l:
+        dtype: float
+      maxuv-l:
+        dtype: float
+      minuvw-m:
+        dtype: float
+      maxuvw-m:
+        dtype: float
+
   dummy:
     image: ''
     command: echo
@@ -32,11 +49,6 @@ cabs:
           positional: true
           repeat: repeat
 
-  wsclean_pol:
-    policies:
-      skip_implicits: true
-    image: ''
-    command: /home/oms/src/wsclean/build/wsclean
 
   mkdir:
     command: mkdir
@@ -126,9 +138,12 @@ cabs:
     command: |
       import sys
       import bdsf as bdsm
-
       # these arguments belong to write_catalog() -- this gives their names -- the rest are used by process_image()
-      WRITE_CATALOG_ARGS = dict(outfile='outfile', catalog_type='catalog_type', catalog_format='format')
+      WRITE_CATALOG_ARGS = dict(catalog_format='format')
+      outfile_gaul = args.pop('outfile_gaul', None)
+      outfile_srl = args.pop('outfile_srl', None)
+      if not outfile_gaul and not outfile_srl:
+          raise RutimeError("at least one of 'outfile_gaul' or 'outfile_srl' needs to be supplied")
 
       # enforce type conversions
       ARG_TYPES = dict(rms_box=tuple)
@@ -140,12 +155,22 @@ cabs:
           # for some reason process_image locks up unless this is set to True. Something to do with the progress bar filling up buffers on stdout?
           #verbose_fitting=True,
       )
+      image_name = args.pop('image')
       for arg, value in args.items():
-          if arg not in WRITE_CATALOG_ARGS and arg != 'image':
+          if arg not in WRITE_CATALOG_ARGS:
               if arg in ARG_TYPES:
                   value = ARG_TYPES[arg](value)
               process_image_args[arg] = value
 
+      print(f"process_image arguments: {image_name} {process_image_args}")
+      sys.stdout.flush()
+
+      print(f"calling process_image")
+      sys.stdout.flush()
+      img = bdsm.process_image(image_name, **process_image_args)
+
+      print(f"calling write_catalog")
+      sys.stdout.flush()
       # form args for write_catalog
       write_catalog_args = dict(clobber=True)
       for arg, value in args.items():
@@ -153,19 +178,16 @@ cabs:
               if arg in ARG_TYPES:
                   value = ARG_TYPES[arg](value)
               write_catalog_args[WRITE_CATALOG_ARGS[arg]] = value
-
-      print(f"process_image arguments: {args['image']} {process_image_args}")
-      sys.stdout.flush()
       print(f"write_catalog arguments: {write_catalog_args}")
       sys.stdout.flush()
-
-      print(f"calling process_image")
-      sys.stdout.flush()
-      img = bdsm.process_image(args['image'], **process_image_args)
-
-      print(f"calling write_catalog")
-      sys.stdout.flush()
-      img.write_catalog(**write_catalog_args)
+      if outfile_gaul:
+          print(f"calling write_catalog('{outfile_gaul}',...)")
+          sys.stdout.flush()
+          img.write_catalog(outfile=outfile_gaul, catalog_type='gaul', **write_catalog_args)
+      if outfile_srl:
+          print(f"calling write_catalog('{outfile_srl}',...)")
+          sys.stdout.flush()
+          img.write_catalog(outfile=outfile_srl, catalog_type='srl', **write_catalog_args)
 
       print(f"finished")
       sys.stdout.flush()
@@ -177,6 +199,10 @@ cabs:
     inputs:
       image:
         dtype: File
+        required: true
+      detection_image:
+        dtype: File
+        required: false
       spectralindex_do:
         dtype: bool
         default: false
@@ -195,9 +221,6 @@ cabs:
       thresh_pix:
         dtype: float
         default: 5
-      catalog_type:
-        choices: [srl, gaul, shap]
-        default: srl
       catalog_format:
         choices: [bbs, ds9, fits, star, kvis, ascii, csv, casabox, sagecal]
         default: ascii
@@ -205,7 +228,9 @@ cabs:
         dtype: bool
         required: false
     outputs:
-      outfile:
+      outfile_gaul:
+        dtype: File
+      outfile_srl:
         dtype: File
 
 
@@ -328,7 +353,7 @@ cabs:
         nom_de_guerre: vis
       spw:
         dtype: str
-        default: all
+        default: ""
       mode:
         implicit: 'summary'
     outputs:
@@ -339,6 +364,7 @@ cabs:
         'Total Flagged: .* Total Counts: .* \((?P<percentage>[\d.]+)%\)':
           - PARSE_OUTPUT:percentage:float
           - HIGHLIGHT:bold green
+
 
   msutils.copycol:
     flavour: python
