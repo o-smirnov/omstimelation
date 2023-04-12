@@ -49,7 +49,6 @@ cabs:
           positional: true
           repeat: repeat
 
-
   mkdir:
     command: mkdir
     inputs:
@@ -233,7 +232,6 @@ cabs:
       outfile_srl:
         dtype: File
 
-
   tigger_convert:
     command: tigger-convert
     inputs:
@@ -275,46 +273,6 @@ cabs:
       num_sources:
         dtype: int
 
-  breizorro:
-    command: breizorro
-    policies:
-      replace: {'_': '-'}
-    inputs:
-      restored_image:
-        dtype: File
-      mask_image:
-        dtype: File
-      merge:
-        dtype: Union[str, List[str]]
-      subtract:
-        dtype: Union[str, List[str]]
-      threshold:
-        dtype: float
-        default: 6.5
-      dilate:
-        dtype: int
-      number_islands:
-        dtype: bool
-      extract_islands:
-        dtype: List[str]
-        policies:
-          repeat: list
-      remove_islands:
-        dtype: List[str]
-        policies:
-          repeat: list
-      ignore_missing_islands:
-        dtype: bool
-      invert:
-        dtype: bool
-      make_binary:
-        dtype: bool
-    outputs:
-      mask:
-        dtype: File
-        nom_de_guerre: outfile
-        required: true 
-
   taql_update:
     command: "taql update"
     policies:
@@ -327,44 +285,6 @@ cabs:
         dtype: List[str]
         policies:
           repeat: list
-
-
-  flagman:
-    command: flagmanager
-    flavour: casa-task
-    inputs:
-      ms: 
-        dtype: MS
-        required: true
-        nom_de_guerre: vis
-      versionname:
-        info: "flag version name"
-      mode: 
-        choices: [save, restore, list]
-        required: true
-
-  flagsummary:
-    command: flagdata
-    flavour: casa-task
-    inputs:
-      ms: 
-        dtype: MS
-        required: true
-        nom_de_guerre: vis
-      spw:
-        dtype: str
-        default: ""
-      mode:
-        implicit: 'summary'
-    outputs:
-      percentage:
-        dtype: float
-    management:
-      wranglers:
-        'Total Flagged: .* Total Counts: .* \((?P<percentage>[\d.]+)%\)':
-          - PARSE_OUTPUT:percentage:float
-          - HIGHLIGHT:bold green
-
 
   msutils.copycol:
     flavour: python
