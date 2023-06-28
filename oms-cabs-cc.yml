@@ -1,0 +1,177 @@
+## this augments the standard 'cabs' config section
+cabs:
+
+  mkdir:
+    command: mkdir
+    inputs:
+      dir:
+        dtype: str
+        policies:
+          positional: true
+
+  mv:
+    command: mv
+    policies:
+      positional: true
+    inputs:
+      src:
+        dtype: File
+        required: true
+    outputs:  
+      dest:
+          dtype: Union[File, Directory]
+          required: true
+
+  cp:
+    command: cp -a
+    policies:
+      positional: true
+    inputs:
+      src:
+        dtype: File
+        required: true
+    outputs:
+      dest:
+        dtype: Union[File, Directory]
+        required: true
+
+  fft-image:
+    flavour: python-code
+    command: |
+      from astropy.io import fits
+      from numpy import fft
+      import math
+      ff = fits.open(image)
+      im = ff[0].data[0,0,...]
+      hdr = ff[0].header
+      im[:] = fft.fftshift(abs(fft.fft2(im)))
+      if lambda_per_arcsec:
+        scaling =  1 / (3600 * lambda_per_arcsec)
+        hdr['CUNIT1'] = hdr['CUNIT2'] = 'deg'
+      else:
+        hdr['CTYPE1'] = 'U'
+        hdr['CTYPE2'] = 'V'
+        hdr['CUNIT1'] = hdr['CUNIT2'] = 'lambda'
+        scaling = 1 
+      hdr['CDELT1'] = scaling / (abs(hdr['CDELT1'])*hdr['NAXIS1']*math.pi/180)
+      hdr['CDELT2'] = scaling / (abs(hdr['CDELT2'])*hdr['NAXIS2']*math.pi/180)
+      hdr['CRVAL1'] = hdr['CRVAL2'] = 0.0
+      ff.writeto(fft_image, overwrite=True)
+    inputs: 
+      image: 
+        dtype: File
+        required: True
+      lambda-per-arcsec:
+        info: |
+          If set, fakes a WCS at RA=0 Dec=0, with that many uv-lambdas per arcsec. This can be useful to
+          fool some FITS viewers (i.e. CARTA) into drawing a useful WCS, which they otherwise don't 
+        dtype: float
+        default: 0
+    outputs:
+      fft-image:
+        dtype: File
+        required: true
+
+lib:
+  steps:
+    wsclean:
+      base:
+        info: "base wsclean settings"
+        cab: wsclean
+        params:
+          padding: 1.3
+          nwlayers-factor: 3
+          use-wgridder: true
+          log-time: true
+
+      dirty:
+        _use: lib.steps.wsclean.base
+        info: "wsclean step for dirty-only image"
+        params:
+          column: CORRECTED_DATA
+          niter: 0
+          # parallel_gridding: 64
+
+      dirty_pol:
+        _use: lib.steps.wsclean.dirty
+        info: "wsclean step for dirty-only IQUV image"
+        cab: wsclean-pol
+        params:
+          pol: IQUV
+
+      image:
+        _use: lib.steps.wsclean.dirty
+        info: "wsclean step for imaging"
+        params:
+          fit-beam: true
+          elliptical-beam: true
+#          parallel-deconvolution: 1500
+          join-channels: true
+          mgain: 0.9
+
+      image_pol:
+        _use: lib.steps.wsclean.image
+        info: "wsclean step for IQUV imaging"
+        cab: wsclean-pol
+        params:
+          join-polarizations: true
+          fit-spectral-pol: =UNSET
+          pol: IQUV
+          mgain: 0.9
+
+      predict:
+        _use: lib.steps.wsclean.base
+        info: "wsclean step for predicting a model"
+        params:
+          predict: true
+
+      predict_pol:
+        _use: lib.steps.wsclean.predict
+        info: "wsclean step for predicting an IQUV model"
+        cab: wsclean-pol
+        params:
+          predict: true
+          pol: IQUV
+
+      predict_pol2:
+        _use: lib.steps.wsclean.predict_pol
+        info: "wsclean step for predicting an IQ model"
+        params:
+          pol: IQUV
+
+
+    quartical:
+      base:
+        cab: quartical
+        params:
+          input_ms:
+            time_chunk: '16'
+            freq_chunk: '0'
+            group_by: [SCAN_NUMBER,FIELD_ID,DATA_DESC_ID]
+            select_uv_range: [150, 0]
+            select_corr: [0, 3]
+          input_model:
+            apply_p_jones: false
+          solver:
+            terms: [K]
+            iter_recipe: [25]
+            propagate_flags: true
+            robust: false
+          output:
+            overwrite: true
+            products: [corrected_data]
+            columns: [CORRECTED_DATA]
+            flags: true
+            apply_p_jones_inv: false
+          mad_flags:
+            enable: true
+            threshold_bl: 5
+            threshold_global: 5
+            max_deviation: 5
+          K:
+            time_interval: 1
+            freq_interval: 0
+            type: delay
+
+
+
