@@ -95,7 +95,7 @@ lib:
       dirty_pol:
         _use: lib.steps.wsclean.dirty
         info: "wsclean step for dirty-only IQUV image"
-        cab: wsclean-pol
+        cab: wsclean
         params:
           pol: IQUV
 
@@ -112,7 +112,7 @@ lib:
       image_pol:
         _use: lib.steps.wsclean.image
         info: "wsclean step for IQUV imaging"
-        cab: wsclean-pol
+        cab: wsclean
         params:
           join-polarizations: true
           fit-spectral-pol: =UNSET
@@ -128,7 +128,7 @@ lib:
       predict_pol:
         _use: lib.steps.wsclean.predict
         info: "wsclean step for predicting an IQUV model"
-        cab: wsclean-pol
+        cab: wsclean
         params:
           predict: true
           pol: IQUV

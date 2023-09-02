@@ -249,43 +249,6 @@ cabs:
         policies:
           positional: true
 
-  crystalball:
-    command: crystalball
-    virtual_env: ~/.venv/cball
-    policies:
-      prefix: '--'
-      replace: {'_': '-'}
-    inputs:
-      ms:
-        dtype: MS
-        writable: true
-        required: true
-        policies:
-          positional: true
-      output_column:
-        dtype: str
-        required: true
-      sky_model:
-        dtype: File
-        required: true
-      within:
-        dtype: File
-      num_sources:
-        dtype: int
-
-  taql_update:
-    command: "taql update"
-    policies:
-      positional: true
-    inputs:
-      ms:
-        dtype: MS
-        required: true
-      commands:
-        dtype: List[str]
-        policies:
-          repeat: list
-
   msutils.copycol:
     flavour: python
     command: MSUtils.msutils.copycol
@@ -441,7 +404,6 @@ lib:
       dirty_pol:
         _use: lib.steps.wsclean.dirty
         info: "wsclean step for dirty-only IQUV image"
-        cab: wsclean_pol
         params:
           pol: IQUV
 
@@ -458,7 +420,6 @@ lib:
       image_pol:
         _use: lib.steps.wsclean.image
         info: "wsclean step for IQUV imaging"
-        cab: wsclean_pol
         params:
           join-polarizations: true
           fit-spectral-pol: =UNSET
@@ -474,7 +435,6 @@ lib:
       predict_pol:
         _use: lib.steps.wsclean.predict
         info: "wsclean step for predicting an IQUV model"
-        cab: wsclean_pol
         params:
           predict: true
           pol: IQUV
