@@ -49,7 +49,6 @@ cabs:
           positional: true
           repeat: repeat
 
-
   mkdir:
     command: mkdir
     inputs:
@@ -233,7 +232,6 @@ cabs:
       outfile_srl:
         dtype: File
 
-
   tigger_convert:
     command: tigger-convert
     inputs:
@@ -250,121 +248,6 @@ cabs:
         dtype: File
         policies:
           positional: true
-
-  crystalball:
-    command: crystalball
-    virtual_env: ~/.venv/cball
-    policies:
-      prefix: '--'
-      replace: {'_': '-'}
-    inputs:
-      ms:
-        dtype: MS
-        writable: true
-        required: true
-        policies:
-          positional: true
-      output_column:
-        dtype: str
-        required: true
-      sky_model:
-        dtype: File
-        required: true
-      within:
-        dtype: File
-      num_sources:
-        dtype: int
-
-  breizorro:
-    command: breizorro
-    policies:
-      replace: {'_': '-'}
-    inputs:
-      restored_image:
-        dtype: File
-      mask_image:
-        dtype: File
-      merge:
-        dtype: Union[str, List[str]]
-      subtract:
-        dtype: Union[str, List[str]]
-      threshold:
-        dtype: float
-        default: 6.5
-      dilate:
-        dtype: int
-      number_islands:
-        dtype: bool
-      extract_islands:
-        dtype: List[str]
-        policies:
-          repeat: list
-      remove_islands:
-        dtype: List[str]
-        policies:
-          repeat: list
-      ignore_missing_islands:
-        dtype: bool
-      invert:
-        dtype: bool
-      make_binary:
-        dtype: bool
-    outputs:
-      mask:
-        dtype: File
-        nom_de_guerre: outfile
-        required: true 
-
-  taql_update:
-    command: "taql update"
-    policies:
-      positional: true
-    inputs:
-      ms:
-        dtype: MS
-        required: true
-      commands:
-        dtype: List[str]
-        policies:
-          repeat: list
-
-
-  flagman:
-    command: flagmanager
-    flavour: casa-task
-    inputs:
-      ms: 
-        dtype: MS
-        required: true
-        nom_de_guerre: vis
-      versionname:
-        info: "flag version name"
-      mode: 
-        choices: [save, restore, list]
-        required: true
-
-  flagsummary:
-    command: flagdata
-    flavour: casa-task
-    inputs:
-      ms: 
-        dtype: MS
-        required: true
-        nom_de_guerre: vis
-      spw:
-        dtype: str
-        default: ""
-      mode:
-        implicit: 'summary'
-    outputs:
-      percentage:
-        dtype: float
-    management:
-      wranglers:
-        'Total Flagged: .* Total Counts: .* \((?P<percentage>[\d.]+)%\)':
-          - PARSE_OUTPUT:percentage:float
-          - HIGHLIGHT:bold green
-
 
   msutils.copycol:
     flavour: python
@@ -521,7 +404,6 @@ lib:
       dirty_pol:
         _use: lib.steps.wsclean.dirty
         info: "wsclean step for dirty-only IQUV image"
-        cab: wsclean_pol
         params:
           pol: IQUV
 
@@ -538,7 +420,6 @@ lib:
       image_pol:
         _use: lib.steps.wsclean.image
         info: "wsclean step for IQUV imaging"
-        cab: wsclean_pol
         params:
           join-polarizations: true
           fit-spectral-pol: =UNSET
@@ -554,7 +435,6 @@ lib:
       predict_pol:
         _use: lib.steps.wsclean.predict
         info: "wsclean step for predicting an IQUV model"
-        cab: wsclean_pol
         params:
           predict: true
           pol: IQUV

@@ -1,7 +1,9 @@
 cabs:
   ddfacet:
     command: DDF.py
-    virtual_env: ~/.venv/ddf
+    backend:
+      native:
+        virtual_env: ~/.venv/ddf
     policies:
       prefix: '--'
       # pass True options as ..option True
@@ -45,7 +47,9 @@ cabs:
 
   killms:
     command: kMS.py
-    virtual_env: ~/.venv/ddf
+    backend:
+      native:
+        virtual_env: ~/.venv/ddf
     policies:
       prefix: '..'
       # replace:
@@ -67,7 +71,9 @@ cabs:
       
   ddf_makemodel:
     command: MakeModel.py
-    virtual_env: ~/.venv/ddf
+    backend:
+      native:
+        virtual_env: ~/.venv/ddf
     inputs:
       ds9PreClusterFile:
         dtype: File
